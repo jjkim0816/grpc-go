@@ -2,24 +2,35 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
-	"sampleProject/grpcProject/pb"
+	"os"
+
+	"bitbucket.org/xinapsedev/malmoy-file-server/pbs"
+	pb "bitbucket.org/xinapsedev/malmoy-file-server/pbs"
+	"bitbucket.org/xinapsedev/malmoy-file-server/util"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // FileServer is the server that provide file services.
 // If want to service for FileServer, make *.go and add interface.
 type FileServer struct {
 	fileStore                         FileStore
-	pb.UnimplementedFileServiceServer // not use, erase error.
+	pb.UnimplementedFileServiceServer // not use, remove error.
 }
 
 // NewFileServer returns a new FileServer
 func NewFileServer(fileStore FileStore) *FileServer {
 	return &FileServer{fileStore, pb.UnimplementedFileServiceServer{}}
+}
+
+// HeartBeat check server lives
+func (server *FileServer) HeartBeat(context.Context, *emptypb.Empty) (*pbs.HeartBeatResponse, error) {
+	return &pbs.HeartBeatResponse{Beat: ""}, nil
 }
 
 // UploadFile is a client-streaming RPC to upload a file
@@ -30,7 +41,7 @@ func (server *FileServer) UploadFile(stream pb.FileService_UploadFileServer) err
 	req, err := stream.Recv()
 	if err != nil {
 		fmt.Println("Recv : ", err)
-		return status.Errorf(codes.Unknown, "cannot receive image info : %v", err)
+		return status.Errorf(codes.Unknown, "cannot receive file info : %v", err)
 	}
 
 	speakerID := req.GetMetadata().GetSpeakerId()
@@ -47,7 +58,7 @@ func (server *FileServer) UploadFile(stream pb.FileService_UploadFileServer) err
 			return err.Err()
 		}
 
-		fmt.Println("waiting to receive more data")
+		// fmt.Println("waiting to receive more data")
 
 		req, err := stream.Recv()
 		if err == io.EOF {
@@ -62,7 +73,7 @@ func (server *FileServer) UploadFile(stream pb.FileService_UploadFileServer) err
 		chunk := req.GetChunkData()
 		size := len(chunk)
 
-		fmt.Println("received a chunk with size : ", size)
+		// fmt.Println("received a chunk with size : ", size)
 
 		fileSize += size
 
@@ -74,8 +85,16 @@ func (server *FileServer) UploadFile(stream pb.FileService_UploadFileServer) err
 	}
 
 	// save chunk data
-	if err := server.fileStore.Save(speakerID, modelID, "test.txt", fileData); err != nil {
+	fileName := fmt.Sprintf("tmp_%s_%s.tar", speakerID, modelID)
+	if err := server.fileStore.Save(speakerID, modelID, fileName, fileData); err != nil {
 		return err
+	}
+
+	// 압축파일 풀기 및 이전 압축 파일 삭제
+	target := fmt.Sprintf("/Users/jjkim/workspace/src/sampleProject/grpcProject/files/%s/%s/%s", speakerID, modelID, fileName)
+	output := fmt.Sprintf("/Users/jjkim/workspace/src/sampleProject/grpcProject/files/%s/%s", speakerID, modelID)
+	if err := util.DecompressTarFile(target, output); err == nil {
+		os.Remove(target)
 	}
 
 	// response

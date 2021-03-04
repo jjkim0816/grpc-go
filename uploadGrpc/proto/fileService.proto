@@ -1,13 +1,20 @@
-// protoc --proto_path=./proto --go_out=./pb --go-grpc_out=./pb ./proto/fileService.proto
+// protoc --proto_path=./proto --go_out=./pbs --go-grpc_out=./pbs ./proto/fileService.proto
 
 syntax = "proto3";
 
-option go_package = "./;pb";
+import "google/protobuf/empty.proto";
 
-package file;
+option go_package = "./;pbs";
+
+package pbs;
 
 service FileService {
+    rpc HeartBeat(google.protobuf.Empty) returns (HeartBeatResponse) {};
     rpc UploadFile(stream UploadFileRequest) returns (UploadFileResponse) {};
+}
+
+message HeartBeatResponse {
+    string Beat = 1;
 }
 
 message UploadFileRequest {

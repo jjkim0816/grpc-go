@@ -15,7 +15,7 @@ type FileStore interface {
 type DiskFileStore struct{}
 
 // NewDiskFileStore return a new DiskFileStore
-func NewDiskFileStore(speakerID, modelID string) *DiskFileStore {
+func NewDiskFileStore() *DiskFileStore {
 	return &DiskFileStore{}
 }
 
@@ -38,6 +38,7 @@ func (store *DiskFileStore) Save(
 		fmt.Println("Create : ", err)
 		return err
 	}
+	defer file.Close()
 
 	_, err = fileData.WriteTo(file)
 	if err != nil {
